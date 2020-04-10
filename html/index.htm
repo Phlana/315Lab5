@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<HTML>
+	<HEAD>
+		<style>
+		body {
+			background-color: white;
+		}
+		table#master {
+			border: 2px solid black;
+			border-collapse: collapse;
+			padding: 10px 10px 10px 10px;
+		}
+
+		table#motor {
+			border: 1px solid black;
+		}
+
+		table#LCD {
+			padding: 44px 44px 44px 0px; 
+			border: 1px solid black;
+		}
+
+		table#A_D {
+			border: 1px solid black;
+			padding: 54px 5px 54px 7px;
+		}
+
+		table#Keypad {
+			border: 1px solid black;
+			padding: 0px 53px 0px 54px
+		}
+		</style>
+
+		<TITLE>
+			ECE315 Lab #5
+		</TITLE>
+	</HEAD>
+	<BODY>
+		<H1>
+			ECE 315 Lab #5 Winter2017
+		</H1>
+		<H1>
+			Peripheral Controller
+		</H1>
+		<FORM METHOD=POST>
+			<input type="hidden" name="ECE315_form" id="function" value=""> 	
+			<table id = "master">
+				<tr>
+					<td>
+						<table id="motor" width="300" height="200">
+							<tr>
+								<th colspan="2">
+									Motor
+								</th>
+							</tr>
+							<tr>
+								<td>
+									<!--FUNCTIONCALL motorHandler -->
+								</td>
+							</tr>
+							<tr>
+								<td>
+									Dir:
+								</td>
+								<td>
+									<input type="radio" name="dir" value="Counter-Clockwise">
+									Counter-Clockwise
+									<br>
+									<input type="radio" name="dir" value="Clockwise">
+									Clockwise
+									<br>
+								</td>
+							</tr>
+							<tr>
+								<td>
+									Rotations:
+								</td>
+								<td>
+									<input type="number" min="1" max="10000" name="rotations" size="20">
+								</td>
+							</tr>
+							<tr>
+								<td>
+									Mode:
+								</td>
+								<td>
+									<input type="radio" name="mode" value="Full">
+									Full
+									<br>
+									<input type="radio" name="mode" value="Half">
+									Half
+									<br>
+								</td>
+							</tr>
+							<tr>
+								<td align="center" colspan="2">
+									<input type="submit" value="Submit Motor Values" onclick="document.getElementById('function').value='validate_motor';"/>
+								</td>
+							</tr>
+						</table> <!-- End Motor Table -->
+					</td>
+
+					<td>
+						<table id="LCD" width="300" height="200">
+							<tr>
+								<tr>
+									<td align="center">
+										<th>
+											LCD
+										</th>
+									</td>
+								</tr>
+							</tr>
+							<td>
+								<!--FUNCTIONCALL LCDHandler -->
+							</td>
+							<tr>
+								<td>
+									String:
+								</td>
+								<td>
+									<input type="text" name="string" pattern="\S.{[\x20-\x7F]+,}\S" maxlength="48" size="20">
+								</td>
+							</tr>
+							<tr>
+								<td align="center" colspan="2">
+									<input type="submit" value="Submit LCD String" onclick="document.getElementById('function').value='validate_string';"/>
+								</td>
+							</tr>
+							<tr>
+							</tr>
+						</table> <!-- End LCD Table -->
+					</td>
+				</tr>
+
+				<tr>
+					<td align="center">
+						<table id="Keypad" width="300" height="200">
+							<tr>
+								<th>
+									Keypad
+								</th>
+							</tr>
+							<tr>
+								<td>
+									Last Button Pressed:
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<!-- FUNCTIONCALL keypadHandler -->
+								</td>
+							</tr>
+							<tr>
+								<td align="center" colspan="2">
+									<input type="submit" value="Read Keypad" onclick="document.getElementById('function').value='read_keypad';"/>
+								</td>
+							</tr>
+						</table> <!-- End Keypad Table -->
+			 		</td>
+
+			 		<td>
+			 			<table id="A_D" width="300" height="200">
+							<tr>
+								<th>
+									A/D
+								</th>
+							</tr>
+							<tr>
+								<td>
+									Light Graph
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<!-- FUNCTIONCALL ADHandler -->
+								</td>
+							</tr>
+							<tr>
+								<tr>
+									<td align="center" colspan="2">
+										<input type="submit" value="Read Sensor" onclick="document.getElementById('function').value='read_sensor';"/>
+									</td>
+								</tr>
+							</tr>
+						</table> <!-- End AD Table -->
+			 		</td>
+			 	</tr>
+			 </table>
+			 
+			<p>
+			<p>
+			<!--FUNCTIONCALL DisplayLameCounter -->
+		</FORM>
+	</BODY>
+</HTML>
