@@ -20,6 +20,12 @@
 #include <sim5441x.h>
 #include "Keypad.h"
 
+#define INT_PIN 45
+
+OS_Q Keypad::data_queue;
+void * Keypad::DataQueueStorage[16];
+bool Keypad::data_queue_is_init = false;
+unsigned char Keypad::common_data = 0;
 
 /* Name:Keypad Constructor
 * Description: Constructor for the Keypad class. Not much to do beyond
@@ -27,10 +33,15 @@
 * Inputs: none
 * Outputs: none
 */
+
 Keypad::Keypad(void)
 {
-last_encoded_data = 0;
+	// Init the Queue (Note: queue is cleared each time a keypad object is initialized_)
+	if (!data_queue_is_init){
+		OSQInit(&data_queue, DataQueueStorage, 16);
+	}
 }
+
 
 /* Name:Init
 * Description: Initializes all the GPIO pins that interface to the keypad.
@@ -39,6 +50,7 @@ last_encoded_data = 0;
 */
 void Keypad::Init(BYTE mode)
 {
+
 	byte_mode = mode;
 // Set the DA, DB, DC, DD , and DAvail pins to be general purpose IO pins
 	KEYPAD_DO_A.function(PINJ2_33_GPIO);	// Keypad Data out A
@@ -55,9 +67,11 @@ void Keypad::Init(BYTE mode)
 		KEYPAD_D_AVAIL.function(PINJ2_45_GPIO);
 		KEYPAD_D_AVAIL.hiz();	// Set KEYPAD Data Available
 	} else if (mode == KEYPAD_INT_MODE) { // KEYPAD_INT_MODE
-
 		// Insert interrupt init here for exercise 3
-
+		// Init pin J2-45 as the interrupt pin, to trigger on the rising edge
+		KEYPAD_D_AVAIL.function(PINJ2_45_IRQ1);
+		KEYPAD_D_AVAIL.drive();
+		SetPinIrq(INT_PIN, RISING_EDGE, Keypad::EdgePortISR1);
 	}
 
 	KEYPAD_MUX_CTRL.function(PINJ2_35_GPIO);
@@ -74,6 +88,10 @@ void Keypad::Init(BYTE mode)
 void Keypad::read_data(void)
 {
 
+	if(byte_mode == KEYPAD_INT_MODE){
+		// Insert exercise 3 code here
+		DisableIrq(INT_PIN);
+	}
 	// Change function of KEYPAD_DO_D/KEYPAD_D_AVAIL to GPIO
 	KEYPAD_DO_D.function(PINJ2_45_GPIO);
 	KEYPAD_DO_D.hiz();
@@ -86,6 +104,40 @@ void Keypad::read_data(void)
 	if (KEYPAD_DO_C) last_encoded_data += 0x04;
 	if (KEYPAD_DO_D) last_encoded_data += 0x08;
 
+
+	if(byte_mode == KEYPAD_INT_MODE) {
+		// Insert exercise 3 code here
+		KEYPAD_MUX_CTRL.set();
+		KEYPAD_D_AVAIL.function(PINJ2_45_IRQ1);
+		KEYPAD_D_AVAIL.drive();
+		SetPinIrq(INT_PIN, RISING_EDGE, Keypad::EdgePortISR1);
+	}
+
+}
+
+void Keypad::read_data_common(void)
+{
+	// This is only called from inturupt so no need to check non-static byte_mode
+	DisableIrq(INT_PIN);
+
+	KEYPAD_DO_D.function(PINJ2_45_GPIO);
+	KEYPAD_DO_D.hiz();
+	KEYPAD_MUX_CTRL.clr(); // all data from encoder are on A side
+
+	common_data = 0;
+	if (KEYPAD_DO_A) common_data += 0x01;
+	if (KEYPAD_DO_B) common_data += 0x02;
+	if (KEYPAD_DO_C) common_data += 0x04;
+	if (KEYPAD_DO_D) common_data += 0x08;
+
+	OSQPost(&Keypad::data_queue, (void *) &common_data);
+
+	// This is only called from inturupt so no need to check non-static byte_mode
+	KEYPAD_MUX_CTRL.set();
+	KEYPAD_D_AVAIL.function(PINJ2_45_IRQ1);
+	KEYPAD_D_AVAIL.drive();
+//	SetPinIrq(INT_PIN, RISING_EDGE, Keypad::EdgePortISR1);
+	EnableIrq(INT_PIN);
 }
 
 /* Name:GetNewButtonNumber
@@ -98,7 +150,7 @@ unsigned char Keypad::GetNewButtonNumber(void)
 {
 
 read_data();
-return last_encoded_data;
+	return last_encoded_data;
 }
 
 
@@ -110,7 +162,7 @@ return last_encoded_data;
 */
 unsigned char Keypad::GetLastButtonNumber(void)
 {
-return last_encoded_data;
+	return last_encoded_data;
 }
 
 /* Name:GetNewButtonString
@@ -124,7 +176,7 @@ return last_encoded_data;
 const char * Keypad::GetNewButtonString(void)
 {
 read_data();
-return(KeypadButtonMapText[last_encoded_data]);
+	return(KeypadButtonMapText[last_encoded_data]);
 }
 
 /* Name: GetLastButtonString
@@ -137,7 +189,7 @@ return(KeypadButtonMapText[last_encoded_data]);
 */
 const char * Keypad::GetLastButtonString(void)
 {
-return(KeypadButtonMapText[last_encoded_data]);
+	return(KeypadButtonMapText[last_encoded_data]);
 }
 
 /* Name: ButtonPressed
@@ -150,12 +202,46 @@ return(KeypadButtonMapText[last_encoded_data]);
 */
 unsigned char Keypad::ButtonPressed(void)
 {
-		KEYPAD_MUX_CTRL.set();
-		if (KEYPAD_D_AVAIL == HIGH) {
-			return TRUE;
-		} else {
-			return FALSE;
-		}
+	KEYPAD_MUX_CTRL.set();
+	if (KEYPAD_D_AVAIL == HIGH) {
+		return TRUE;
+	} else {
+		return FALSE;
+	}
+}
+
+/* Name: PendDataQueue
+* Description: Pend the data queue to put any new data in 'last_encoded_data' for this keypad
+* Inputs: none
+* Outputs: true if new data was found in queue and stored in this class, else false
+*/
+bool Keypad::PendDataQueue(int delay_ticks) {
+	BYTE err = OS_NO_ERR;
+	unsigned char * data = (unsigned char *) OSQPend(&data_queue, delay_ticks, &err);
+	if (err == OS_NO_ERR && data != NULL) {
+		last_encoded_data = *data;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+/* Name: PendDataQueueNoWait
+* Description: Pend the data queue without waiting to put any new data in 'last_encoded_data' for this keypad
+* Inputs: none
+* Outputs: true if new data was found in queue and stored in this class, else false
+*/
+bool Keypad::PendDataQueueNoWait() {
+	BYTE err = OS_NO_ERR;
+	unsigned char * data = (unsigned char *) OSQPendNoWait(&data_queue, &err);
+	if (err == OS_NO_ERR && data != NULL) {
+		last_encoded_data = *data;
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 /* Name: EdgePortISR1
@@ -165,7 +251,7 @@ unsigned char Keypad::ButtonPressed(void)
 */
 void Keypad::EdgePortISR1(void) {
 	// Insert your ISR code here for exercise 3
-
+	Keypad::read_data_common();
 }
 
 
