@@ -46,15 +46,17 @@
 
 const char KeypadButtonMapText[BUTTONS] [MAX_BUTTON_NAME] =
 {
-"*", "*", "*", "*",
-"*", "*", "*", "*",
-"*", "*", "*", "*",
-"*", "*", "*", "*"
+"0", "1", "2", "3",
+"4", "5", "6", "7",
+"8", "9", "10", "11",
+"12", "13", "14", "15"
 };
 
 class Keypad {
 
 protected:
+
+	static unsigned char common_data;
 
 	/* Most recently read button from the Data Out lines on the encoder */
 	unsigned char last_encoded_data;
@@ -62,7 +64,15 @@ protected:
 	/* Read the Data Out lines on the encoder */
 	void read_data(void);
 
+	// Only called from interrupt
+	static void read_data_common(void);
+
+	static unsigned char last_encoded_data_common;
+
 	BYTE byte_mode;
+	static bool data_queue_is_init;
+	static void * DataQueueStorage[16];
+	static OS_Q data_queue;
 
 public:
 
@@ -72,6 +82,11 @@ public:
 	/* Initialization of pins occurs here */
 	/* mode should be either KEYPAD_POLL_MODE or KEYPAD_INT_MODE */
 	void Init(BYTE mode);
+
+	/*
+	 * Return true if this keypad has been initialized, else return false
+	 */
+	bool Is_Init();
 
 	/* Returns a pointer to a string corresponding to the last read button.
 	 * Does not read the Data Out lines.
@@ -103,6 +118,16 @@ public:
 	 * This method does not read the Data out lines.
 	 */
 	unsigned char GetLastButtonNumber(void);
+
+	/*
+	 * Pend the data queue to put any new data in 'last_encoded_data' for this keypad
+	 */
+	bool PendDataQueue(int delay_ticks);
+
+	/*
+	 * Pend the data queue without delay to put any new data in 'last_encoded_data' for this keypad
+	 */
+	bool PendDataQueueNoWait();
 
 	/* Init IRQ1 so that rising edge interrupt is used.
 	 *

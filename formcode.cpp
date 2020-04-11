@@ -38,11 +38,11 @@
 #include <iosys.h>
 #include <system.h>
 #include <limits.h>
+#include <math.h>
 #include "Stepper.h"
 #include "formdata.h"
 #include "AD.h"
 #include "Keypad.h"
-
 
 /*-------------------------------------------------------------------
  * The FlashForm example demonstrates three different capabilities:
@@ -142,6 +142,189 @@ const char * checked = "checked";
 
 #define BAR_GRAPH_0		"<img align = \"middle\" src=\"BarGraph0.bmp\">"
 #define KEYPAD_EMPTY	"<img align = \"middle\" src=\"Keypad_empty.bmp\">"
+
+
+void RemoveWhitespace(char *s) {
+	for (char* s2 = s; *s2; ++s2) {
+		if (!isspace(*s2)) {
+			*s++ = *s2;
+		}
+	}
+	*s = 0;
+}
+
+bool ValidateMotorRotation(char * rotations) {
+	RemoveWhitespace(rotations);
+	bool err = false;
+
+	if (strlen(rotations) <= 5) {
+		for(int i = 0; i < strlen(rotations); i++) {
+			if (!isdigit(rotations[i])){
+				myData.Lock();
+				myData.SetError("Rotation value is not a valid number");
+				myData.Unlock();
+				return true;
+			}
+		}
+
+		int num = atoi(rotations);
+		if (num < 1) {
+			myData.Lock();
+			myData.SetError("Rotation value less than 1");
+			myData.Unlock();
+			err = true;
+		}
+		else if (num > 10000){
+			myData.Lock();
+			myData.SetError("Rotation value greater than 10000");
+			myData.Unlock();
+			err = true;
+		}
+		else{
+			myData.Lock();
+			myData.ClearError();
+			myData.SetMotorRotations((DWORD) num);
+			myData.Unlock();
+	   }
+	}
+	else{
+		myData.Lock();
+		myData.SetError("Rotation value contains too many characters");
+		myData.Unlock();
+		err = true;
+	}
+
+	return err;
+}
+
+bool ValidateMotorDir(char * dir){
+	RemoveWhitespace(dir);
+	bool err = false;
+	myData.Lock();
+	if(strcmp("Clockwise", dir)){
+		myData.SetMotorDirection(CLOCKWISE);
+	}
+	else if(strcmp("Counter-Clockwise", dir)){
+		myData.SetMotorDirection(COUNTER_CLOCKWISE);
+	}
+	else {
+		myData.SetError("Dir is invalid");
+		err = true;
+	}
+	myData.Unlock();
+	return err;
+}
+
+bool ValidateMotorMode(char * mode){
+	RemoveWhitespace(mode);
+	bool err = false;
+	myData.Lock();
+	if(strcmp("Full", mode)){
+		myData.SetMotorMode(STEPPER_MODE_HALF_STEP);
+	}else if(strcmp("Half", mode)){
+		myData.SetMotorMode(STEPPER_MODE_FULL_STEP);
+	}
+	else {
+		myData.SetError("Mode is invalid");
+		err = true;
+	}
+	myData.Unlock();
+	return err;
+}
+
+
+bool ValidateMotor(char *buffer, char *pData){
+	myData.ClearError();
+	int err = false;
+
+	int result=ExtractPostData( "rotations" ,pData, buffer, MAX_POST_REQUEST_BUFFER );
+	if (result <= 0){
+		myData.Lock();
+		myData.SetError("Could not extract post data for rotations");
+		myData.Unlock();
+		err = true;
+	}
+	else{
+		err = ValidateMotorRotation(buffer);
+	}
+
+	if (!err){
+		result = ExtractPostData( "dir" ,pData, buffer, MAX_POST_REQUEST_BUFFER );
+		if (result <= 0){
+			myData.Lock();
+			myData.SetError("Could not extract post data for dir");
+			myData.Unlock();
+			err = true;
+		}
+		else{
+			err = ValidateMotorDir(buffer);
+		}
+	}
+
+	if (!err) {
+		result = ExtractPostData( "mode" ,pData, buffer, MAX_POST_REQUEST_BUFFER );
+		if (result <= 0){
+			myData.Lock();
+			myData.SetError("Could not extract post data for mode");
+			myData.Unlock();
+			err = true;
+		}
+		else {
+			err = ValidateMotorMode(buffer);
+		}
+	}
+
+	return err;
+}
+
+bool ValidateString(char *s){
+	bool err = false;
+
+	RemoveWhitespace(s);
+	myData.ClearError();
+
+	if(strlen(s) <= LCD_STRING_LENGTH){
+		int c;
+		for(int i = 0; i < strlen(s); i++) {
+			c = (int) buffer[i];
+			if (c < 0x20 || c > 0x7F){
+				myData.Lock();
+				myData.SetError("A character in the LCD String is not a valid ASCII character in range 0x20 to 0x7F");
+				myData.Unlock();
+				return true;
+			}
+		}
+
+		myData.Lock();
+		myData.SetLCDString(s);
+		myData.Unlock();
+	}
+	else {
+		myData.Lock();
+		myData.SetError("LCD String longer than 48 characters");
+		err = true;
+		myData.Unlock();
+	}
+	return err;
+}
+
+void ReadKeypad(){
+	if (myKeypad.PendDataQueueNoWait()){
+		myData.Lock();
+		myData.SetKeypadKey(myKeypad.GetLastButtonNumber());
+		myData.Unlock();
+	}
+}
+
+void ReadSensor(){
+	myData.Lock();
+	myAD.StartAD(); // Start AD
+	while(!myAD.ADDone()); // Busy Wait
+	myData.SetADSegment(floor(myAD.GetADResult(0) / 275)); // read result
+	myAD.StopAD(); // stop AD
+	myData.Unlock();
+}
+
 /*-------------------------------------------------------------------
  * When you write a MyDoPost() function and register it, it will
  * be called when a web browser submits a Form POST. This is how
@@ -153,16 +336,39 @@ int MyDoPost( int sock, char *url, char *pData, char *rxBuffer )
 
 	// Parse the data from the form here
 	// You'll need to call ExtractPostData multiple times
+	int result=ExtractPostData( "ECE315_form", pData, buffer, MAX_POST_REQUEST_BUFFER);
+
+	if (result > 0){
+		if(strcmp("validate_motor", buffer) == 0){
+			ValidateMotor(buffer, pData);
+		}
+		if(strcmp("validate_string", buffer) == 0){
+			result=ExtractPostData( "string" ,pData, buffer, MAX_POST_REQUEST_BUFFER );
+			if (result > 0){
+				ValidateString(buffer);
+			}
+			else {
+				myData.Lock();
+				myData.SetError("Could not extract post data for string");
+				myData.Unlock();
+			}
+		}
+		if(strcmp("read_keypad", buffer) == 0){
+			ReadKeypad();
+		}
+		if(strcmp("read_sensor", buffer) == 0){
+			ReadSensor();
+		}
+	}
 
 
    // We have to respond to the post with a new HTML page...
    // In this case we will redirect so the browser will
-   //go to that URL for the response...
+   // go to that URL for the response...
    RedirectResponse( sock, "INDEX.HTM" );
 
    return 0;
 }
-
 /*-------------------------------------------------------------------
  * Function to register the MyDoPost() function as the POST handler
  * ----------------------------------------------------------------*/

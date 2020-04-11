@@ -38,13 +38,13 @@ FormData::~FormData() {
 	// TODO Auto-generated destructor stub
 }
 
-/* Name:
- * Description:
+/* Name: SetMotorDirection
+ * Description: Set the direction of the motor to clockwise or counter-clockwise
  * Inputs:
  * Outputs:
  */
-void FormData::SetMotorDirection(char * dir){
-
+void FormData::SetMotorDirection(BYTE dir){
+	byte_motor_direction = dir;
 }
 
 /* Name:
@@ -65,6 +65,14 @@ BYTE FormData::GetMotorMode(void){
 	return byte_motor_mode;
 }
 
+/* Name:
+ * Description:
+ * Inputs:
+ * Outputs:
+ */
+void FormData::SetMotorMode(BYTE mode){
+	byte_motor_mode = mode;
+}
 
 
 /* Name:
@@ -79,24 +87,21 @@ void FormData::Init(void){
 	byte_motor_direction = CLOCKWISE;
 	byte_motor_mode = STEPPER_MODE_FULL_STEP;
 	str_LCD[0] = '\0';
+	ClearError();
 	byte_keypad_key_number = 16; // 16 means unset should display empty version
 	byte_AD_segment = 0;
 }
-
-
-
 
 DWORD FormData::GetMotorRotations(void) {
 	return dword_motor_rotations;
 }
 
-void FormData::SetMotorRotations(char * rot) {
-
+void FormData::SetMotorRotations(DWORD rotations) {
+	dword_motor_rotations = rotations;
 }
 
-
 void FormData::SetLCDString (char * str){
-
+	strcpy(str_LCD, str);
 }
 
 char * FormData::GetLCDString (void){
@@ -115,6 +120,18 @@ BYTE FormData::GetKeypadKey(void){
 void FormData::SetADSegment(BYTE seg){
 	byte_AD_segment = seg;
 
+}
+
+void FormData::ClearError(){
+	error_message[0] = '\0';
+}
+
+void FormData::SetError(char * msg){
+	strcpy(error_message, msg);
+}
+
+void FormData::GetError(char * output){
+	strcpy(output, error_message);
 }
 
 BYTE FormData::GetADSegment(void){
