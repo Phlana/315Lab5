@@ -18,6 +18,10 @@
 extern "C" {
 void UserMain(void * pd);
 void DisplayLameCounter( int sock, PCSTR url );
+void motorHandler(int sock, PCSTR url);
+void LCDHandler(int sock, PCSTR url);
+void keypadHandler(int sock, PCSTR url);
+void ADHandler(int sock, PCSTR url);
 }
 
 extern void RegisterPost();
@@ -78,7 +82,8 @@ void motorHandler(int sock, PCSTR url) {
 	if ((sock > 0) && (url != NULL)) {
 		iprintf(url);
 		myData.Lock();
-		char *motorError = myData.GetMotorErrorMessage();
+		char motorError[100];
+		myData.GetError(motorError);
 		myData.Unlock();
 
 		snprintf(buffer, MAX_COUNTER_BUFFER_LENGTH, motorError);
@@ -92,7 +97,8 @@ void LCDHandler(int sock, PCSTR url) {
 	if ((sock > 0) && (url != NULL)) {
 		iprintf(url);
 		myData.Lock();
-		int LCDError = myData.GetLCDErrorMessage();
+		char LCDError[100];
+		myData.GetError(LCDError);
 		myData.Unlock();
 
 		snprintf(buffer, MAX_COUNTER_BUFFER_LENGTH, LCDError);
@@ -125,7 +131,7 @@ void ADHandler(int sock, PCSTR url) {
 	if ((sock > 0) && (url != NULL)) {
 		iprintf(url);
 		myData.Lock();
-		char *ADSegment = myData.GetADSegment();
+		int ADSegment = myData.GetADSegment();
 		myData.Unlock();
 
 		snprintf(buffer, MAX_COUNTER_BUFFER_LENGTH, "<img src=\"BarGraph%d.bmp\">", ADSegment);
